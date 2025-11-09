@@ -1,381 +1,413 @@
-// script.js - visualizer + advanced controls + theme toggle (polished UI)
+// script.js - final simplified controls + controller mapping + presets
 let gpIndex = null;
-let loopHandle = null;
-let runningContinuous = false;
+let running = false;
+let continuousMode = false;
+let runHandle = null;
+let lastButtonStates = [];
+let holdTimers = {}; // for hold repeats
 
+// UI refs
 const gpInfo = document.getElementById('gp-info');
 const supportInfo = document.getElementById('support-info');
 const controls = document.getElementById('controls');
 
-const strong = document.getElementById('strong');
-const weak = document.getElementById('weak');
+const repeatsInput = document.getElementById('repeats');
+const repDec = document.getElementById('repDec');
+const repInc = document.getElementById('repInc');
+
 const frequency = document.getElementById('frequency');
-const duty = document.getElementById('duty');
-const speed = document.getElementById('speed');
-const duration = document.getElementById('duration');
-const repeats = document.getElementById('repeats');
-const motorTarget = document.getElementById('motorTarget');
-const patternSelect = document.getElementById('patternSelect');
-
-const strongVal = document.getElementById('strongVal');
-const weakVal = document.getElementById('weakVal');
 const freqVal = document.getElementById('freqVal');
-const dutyVal = document.getElementById('dutyVal');
+const freqDec = document.getElementById('freqDec');
+const freqInc = document.getElementById('freqInc');
+
+const speed = document.getElementById('speed');
 const speedVal = document.getElementById('speedVal');
-const durVal = document.getElementById('durVal');
-const repeatsVal = document.getElementById('repeatsVal');
+const speedDec = document.getElementById('speedDec');
+const speedInc = document.getElementById('speedInc');
 
-const pulseBtn = document.getElementById('pulseBtn');
-const loopBtn = document.getElementById('loopBtn');
+const continuousCheckbox = document.getElementById('continuous');
+const presetSelect = document.getElementById('presetSelect');
+
+const playBtn = document.getElementById('playBtn');
+const startBtn = document.getElementById('startBtn');
 const stopBtn = document.getElementById('stopBtn');
-const randomBtn = document.getElementById('randomBtn');
+const emergencyBtn = document.getElementById('emergencyBtn');
+const surpriseBtn = document.getElementById('surpriseBtn');
 
-const themeToggle = document.getElementById('themeToggle');
-const changeEverything = document.getElementById('changeEverything');
-
+const outBar = document.getElementById('outBar').querySelector('.fill');
+const outNum = document.getElementById('outNum');
+const buttonsGrid = document.getElementById('buttons');
 const logEl = document.getElementById('log');
 
-const strongBar = document.getElementById('strongBar').querySelector('.fill');
-const weakBar = document.getElementById('weakBar').querySelector('.fill');
-const strongNum = document.getElementById('strongNum');
-const weakNum = document.getElementById('weakNum');
-const buttonsContainer = document.getElementById('buttons');
-const axesContainer = document.getElementById('axes');
+// default output magnitude (we approximate since many controllers expose single actuator)
+let outputMag = 0.6;
 
-[strong, weak, frequency, duty, speed, duration, repeats].forEach(el => {
-  el.addEventListener('input', updateLabels);
-});
-function updateLabels(){
-  strongVal.textContent = strong.value;
-  weakVal.textContent = weak.value;
-  freqVal.textContent = frequency.value;
-  dutyVal.textContent = duty.value;
-  speedVal.textContent = speed.value;
-  durVal.textContent = duration.value;
-  repeatsVal.textContent = repeats.value;
+// controller button mapping (indexes -> action)
+const mapping = {
+  0: 'play',            // A
+  1: 'toggleStartStop', // B
+  2: 'emergency',       // X
+  3: 'randomize',       // Y
+  4: 'speedDown',       // LB
+  5: 'speedUp',         // RB
+  12: 'freqUp',         // DPadUp
+  13: 'freqDown',       // DPadDown
+  14: 'repeatsDown',    // DPadLeft
+  15: 'repeatsUp',      // DPadRight
+  9: 'toggleContinuous',// Start
+  8: 'toggleButtons',   // Back
+};
+
+// Build button grid UI (show first 16 buttons by default)
+const BUTTON_COUNT = 16;
+for(let i=0;i<BUTTON_COUNT;i++){
+  const b = document.createElement('div');
+  b.className = 'button-dot';
+  b.dataset.index = i;
+  b.title = 'Button ' + i;
+  b.textContent = 'B' + i;
+  buttonsGrid.appendChild(b);
+  // clickable to simulate press
+  b.addEventListener('click', ()=> handleActionForIndex(i));
 }
 
-window.addEventListener("gamepadconnected", (e) => {
+// helper: log
+function log(msg){
+  const d = document.createElement('div');
+  d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  logEl.prepend(d);
+}
+
+// UI helpers
+freqVal.textContent = frequency.value;
+speedVal.textContent = speed.value;
+frequency.addEventListener('input', ()=> freqVal.textContent = frequency.value);
+speed.addEventListener('input', ()=> speedVal.textContent = speed.value);
+
+repDec.addEventListener('click', ()=> adjustRepeats(-1));
+repInc.addEventListener('click', ()=> adjustRepeats(1));
+function adjustRepeats(delta){ let v = parseInt(repeatsInput.value||'1'); v = Math.max(1, Math.min(999, v+delta)); repeatsInput.value = v; }
+
+freqDec && freqDec.addEventListener && freqDec.addEventListener('click', ()=> { frequency.value = Math.max(1, parseInt(frequency.value)-1); freqVal.textContent = frequency.value; });
+freqInc && freqInc.addEventListener && freqInc.addEventListener('click', ()=> { frequency.value = Math.min(120, parseInt(frequency.value)+1); freqVal.textContent = frequency.value; });
+
+// speed dec/inc placeholders (links may not exist in some DOM variants)
+document.getElementById('speedDec')?.addEventListener('click', ()=> { speed.value = Math.max(100, parseInt(speed.value)-50); speedVal.textContent = speed.value; });
+document.getElementById('speedInc')?.addEventListener('click', ()=> { speed.value = Math.min(3000, parseInt(speed.value)+50); speedVal.textContent = speed.value; });
+
+continuousCheckbox.addEventListener('change', ()=> { continuousMode = continuousCheckbox.checked; log('Continuous: ' + continuousMode); });
+
+presetSelect.addEventListener('change', ()=> {
+  const p = presetSelect.value;
+  applyPreset(p);
+});
+
+playBtn.addEventListener('click', ()=> playOnce());
+startBtn.addEventListener('click', ()=> startRun());
+stopBtn.addEventListener('click', ()=> stopRun());
+emergencyBtn.addEventListener('click', ()=> emergencyStop());
+surpriseBtn.addEventListener('click', ()=> { randomizeControls(); toggleTheme(); log('Surprise!'); });
+
+// theme toggle (simple)
+const themeToggle = document.getElementById('themeToggle');
+themeToggle.addEventListener('click', ()=> { document.body.classList.toggle('alt'); });
+
+// initial: show controls
+controls.classList.remove('hidden');
+
+// Gamepad detection
+window.addEventListener('gamepadconnected', (e)=> {
   gpIndex = e.gamepad.index;
-  log(`Gamepad connected: ${e.gamepad.id} (index ${gpIndex})`);
-  updateUI();
-});
-window.addEventListener("gamepaddisconnected", (e) => {
-  log(`Gamepad disconnected: ${e.gamepad.id}`);
-  gpIndex = null;
-  updateUI();
+  log('Gamepad connected: ' + e.gamepad.id + ' (index ' + gpIndex + ')');
+  gpInfo.textContent = 'Detected: ' + e.gamepad.id;
+  supportInfo.textContent = '';
+  // init last states
+  lastButtonStates = new Array(e.gamepad.buttons.length).fill(false);
 });
 
-function scanGamepads() {
-  const gps = navigator.getGamepads ? navigator.getGamepads() : [];
-  for (let i = 0; i < gps.length; i++) {
-    if (gps[i] && gps[i].connected) {
-      if (gpIndex === null) {
-        gpIndex = gps[i].index;
-        log(`Gamepad detected: ${gps[i].id} (index ${gpIndex})`);
-        updateUI();
-      }
-      return;
-    }
-  }
+window.addEventListener('gamepaddisconnected', (e)=> {
+  log('Gamepad disconnected: ' + e.gamepad.id);
   gpIndex = null;
-  updateUI();
-}
+  gpInfo.textContent = 'No gamepad detected. Connect a controller and press any button.';
+});
 
-function getGamepad() {
+// Polling loop to read gamepad and update UI, detect presses
+function pollGamepad(){
   const gps = navigator.getGamepads ? navigator.getGamepads() : [];
-  if (gpIndex !== null && gps[gpIndex]) return gps[gpIndex];
-  for (let g of gps) if (g && g.connected) return g;
-  return null;
-}
-
-function updateUI() {
-  const gp = getGamepad();
-  if (!gp) {
-    gpInfo.textContent = 'No gamepad detected. Connect a controller and press any button.';
-    controls.classList.add('hidden');
-    supportInfo.textContent = '';
-    clearVisualizer();
+  const gp = gps[gpIndex] || gps.find(g=>g && g.connected) || null;
+  if(!gp) {
+    requestAnimationFrame(pollGamepad);
     return;
   }
-  gpInfo.textContent = `Detected: ${gp.id}`;
-  controls.classList.remove('hidden');
-
-  const hasHaptics = gp.hapticActuators && gp.hapticActuators.length > 0;
-  const alt = gp.vibrationActuator && typeof gp.vibrationActuator.playEffect === 'function';
-  if (hasHaptics || alt) {
-    supportInfo.textContent = `Haptics available (actuators: ${ (gp.hapticActuators || []).length || (alt ? 1 : 0) }).`;
-  } else {
-    supportInfo.textContent = 'No haptic actuators exposed by this controller in this browser.';
-  }
-}
-
-// visualizer helpers
-function clearVisualizer(){
-  strongBar.style.width = '0%';
-  weakBar.style.width = '0%';
-  strongNum.textContent = '0.00';
-  weakNum.textContent = '0.00';
-  buttonsContainer.innerHTML = '';
-  axesContainer.innerHTML = '';
-}
-
-function renderGamepadState(){
-  const gp = getGamepad();
-  if (!gp) return;
-  // Buttons
-  buttonsContainer.innerHTML = '';
-  gp.buttons.forEach((b, i) => {
-    const d = document.createElement('span');
-    d.className = 'button-dot' + (b.pressed ? ' pressed' : '');
-    d.textContent = 'B' + i + (b.pressed ? ' ✓' : '');
-    buttonsContainer.appendChild(d);
-  });
-  // Axes
-  axesContainer.innerHTML = '';
-  gp.axes.forEach((a, i) => {
-    const row = document.createElement('div');
-    row.className = 'axis-row';
-    const label = document.createElement('div');
-    label.className = 'axis-label';
-    label.textContent = 'A' + i;
-    const bar = document.createElement('div');
-    bar.className = 'axis-bar';
-    const fill = document.createElement('div');
-    fill.className = 'axis-fill';
-    const pct = Math.round((a + 1) / 2 * 100);
-    fill.style.width = pct + '%';
-    bar.appendChild(fill);
-    row.appendChild(label);
-    row.appendChild(bar);
-    axesContainer.appendChild(row);
-  });
-}
-
-// haptics sending
-async function playHaptics({strongMag=0, weakMag=0, ms=200}) {
-  const gp = getGamepad();
-  if (!gp) { log('No controller available'); return; }
-
-  // update visualizer immediately
-  updateBars(strongMag, weakMag);
-
-  if (gp.hapticActuators && gp.hapticActuators.length > 0) {
-    try {
-      const mag = Math.max(strongMag, weakMag);
-      await gp.hapticActuators[0].pulse(parseFloat(mag), parseInt(ms));
-      log(`pulse (hapticActuators) mag=${mag} dur=${ms}`);
-    } catch (e) {
-      log('Error (hapticActuators): ' + e.message);
+  // update buttons UI
+  for(let i=0;i<Math.min(BUTTON_COUNT, gp.buttons.length); i++){
+    const pressed = gp.buttons[i].pressed;
+    const el = buttonsGrid.querySelector('[data-index="'+i+'"]');
+    if(el){
+      if(pressed) el.classList.add('pressed'); else el.classList.remove('pressed');
     }
-    setTimeout(()=> updateBars(0,0), Math.max(50, ms));
-    return;
-  }
-
-  if (gp.vibrationActuator && typeof gp.vibrationActuator.playEffect === 'function') {
-    try {
-      await gp.vibrationActuator.playEffect('dual-rumble', {
-        duration: parseInt(ms),
-        strongMagnitude: parseFloat(strongMag),
-        weakMagnitude: parseFloat(weakMag)
-      });
-      log(`playEffect dual-rumble s=${strongMag} w=${weakMag} dur=${ms}`);
-    } catch (e) {
-      log('Error (vibrationActuator): ' + e.message);
+    // detect edges
+    if(pressed && !lastButtonStates[i]){
+      // button just pressed
+      handleActionForIndex(i);
+      // start hold logic for certain controls (repeats/freq/speed) if needed
+      startHoldRepeat(i);
     }
-    setTimeout(()=> updateBars(0,0), Math.max(50, ms));
-    return;
+    if(!pressed && lastButtonStates[i]){
+      // released
+      stopHoldRepeat(i);
+    }
+    lastButtonStates[i] = pressed;
   }
+  // axes ignored here
 
-  log('No supported haptic API exposed by this controller.');
-  setTimeout(()=> updateBars(0,0), 120);
+  requestAnimationFrame(pollGamepad);
 }
+requestAnimationFrame(pollGamepad);
 
-function updateBars(s,w){
-  strongBar.style.width = Math.round(s*100) + '%';
-  weakBar.style.width = Math.round(w*100) + '%';
-  strongNum.textContent = s.toFixed(2);
-  weakNum.textContent = w.toFixed(2);
-}
-
-// Patterns
-async function singlePatternOnce(opts={}) {
-  const rep = opts.repeats || 1;
-  for (let r=0; r<rep; r++) {
-    await runPatternCycle(opts);
-    if (r < rep-1) await sleep(opts.speedMs || 200);
+// Hold-repeat behavior for adjustments
+function startHoldRepeat(index){
+  const action = mapping[index];
+  if(!action) return;
+  if(['freqUp','freqDown','repeatsUp','repeatsDown','speedUp','speedDown'].includes(action)){
+    // initial delay 300ms then repeat every 120ms
+    holdTimers[index] = setTimeout(()=> {
+      holdTimers[index] = setInterval(()=> handleActionForIndex(index), 120);
+    }, 300);
   }
 }
-
-async function runPatternCycle({freq=20, duty=0.5, strongMag=0.6, weakMag=0.6, durationOverride=null, motor='both'}={}) {
-  let s = strongMag, w = weakMag;
-  if (motor === 'strong') w = 0;
-  if (motor === 'weak') s = 0;
-  if (durationOverride !== null && durationOverride > 0) {
-    await playHaptics({strongMag: s, weakMag: w, ms: durationOverride});
-    return;
-  }
-  const periodMs = Math.max(10, Math.floor(1000 / freq));
-  const onMs = Math.max(5, Math.floor(periodMs * duty));
-  const offMs = Math.max(0, periodMs - onMs);
-  const cycles = Math.max(1, Math.floor( (periodMs*6) / periodMs ));
-  for (let i=0;i<cycles;i++) {
-    await playHaptics({strongMag: s, weakMag: w, ms: onMs});
-    if (offMs > 0) await sleep(offMs);
+function stopHoldRepeat(index){
+  if(holdTimers[index]){
+    clearTimeout(holdTimers[index]);
+    clearInterval(holdTimers[index]);
+    delete holdTimers[index];
   }
 }
 
-// UI handlers
-pulseBtn.addEventListener('click', async () => {
-  const opts = readOptions();
-  log('Sending single pattern...');
-  await singlePatternOnce(opts);
+// Execute mapped action
+function handleActionForIndex(index){
+  const action = mapping[index];
+  if(!action) return;
+  switch(action){
+    case 'play': playOnce(); break;
+    case 'toggleStartStop': toggleStartStop(); break;
+    case 'emergency': emergencyStop(); break;
+    case 'randomize': randomizeControls(); break;
+    case 'speedDown': speed.value = Math.max(100, parseInt(speed.value)-50); speedVal.textContent = speed.value; break;
+    case 'speedUp': speed.value = Math.min(3000, parseInt(speed.value)+50); speedVal.textContent = speed.value; break;
+    case 'freqUp': frequency.value = Math.min(120, parseInt(frequency.value)+1); freqVal.textContent = frequency.value; break;
+    case 'freqDown': frequency.value = Math.max(1, parseInt(frequency.value)-1); freqVal.textContent = frequency.value; break;
+    case 'repeatsDown': repeatsInput.value = Math.max(1, parseInt(repeatsInput.value)-1); break;
+    case 'repeatsUp': repeatsInput.value = Math.min(999, parseInt(repeatsInput.value)+1); break;
+    case 'toggleContinuous': continuousCheckbox.checked = !continuousCheckbox.checked; continuousMode = continuousCheckbox.checked; log('Continuous: ' + continuousMode); break;
+    case 'toggleButtons': toggleButtonsPanel(); break;
+  }
+}
+
+// Toggle buttons panel visibility
+function toggleButtonsPanel(){ 
+  const panel = document.querySelector('.gamepad-panel');
+  panel.style.display = (panel.style.display === 'none') ? '' : 'none';
+}
+
+// Presets apply simple settings for continuous mode
+function applyPreset(p){
+  if(!p) return;
+  switch(p){
+    case 'gentle':
+      frequency.value = 8; freqVal.textContent = frequency.value;
+      speed.value = 1200; speedVal.textContent = speed.value;
+      repeatsInput.value = 2;
+      outputMag = 0.35;
+      break;
+    case 'medium':
+      frequency.value = 18; freqVal.textContent = frequency.value;
+      speed.value = 800; speedVal.textContent = speed.value;
+      repeatsInput.value = 3;
+      outputMag = 0.6;
+      break;
+    case 'strong':
+      frequency.value = 40; freqVal.textContent = frequency.value;
+      speed.value = 600; speedVal.textContent = speed.value;
+      repeatsInput.value = 4;
+      outputMag = 0.9;
+      break;
+    case 'pulse':
+      frequency.value = 20; freqVal.textContent = frequency.value;
+      speed.value = 400; speedVal.textContent = speed.value;
+      repeatsInput.value = 6;
+      outputMag = 0.8;
+      break;
+    case 'wave':
+      frequency.value = 12; freqVal.textContent = frequency.value;
+      speed.value = 900; speedVal.textContent = speed.value;
+      repeatsInput.value = 3;
+      outputMag = 0.6;
+      break;
+    case 'random':
+      randomizeControls();
+      break;
+  }
+  log('Preset applied: ' + p);
+}
+
+// Play single sequence (one pattern based on frequency & speed & repeats)
+async function playOnce(){
+  if(running){ log('Already running'); return; }
+  log('Play once');
+  await runPatternCycle({freq: parseInt(frequency.value), speedMs: parseInt(speed.value), repeats: 1, mag: outputMag});
   log('Pattern finished.');
-});
+}
 
-let continuous = false;
-loopBtn.addEventListener('click', () => {
-  if (continuous) return;
-  continuous = true;
-  loopBtn.textContent = 'Running…';
+// Start continuous or finite run
+function startRun(){
+  if(running){ log('Already running'); return; }
+  running = true;
   stopBtn.disabled = false;
-  startContinuous();
-});
-stopBtn.addEventListener('click', () => {
-  stopContinuous();
-});
-randomBtn.addEventListener('click', () => {
-  randomizeControls();
-});
+  playBtn.disabled = true;
+  startBtn.disabled = true;
+  log('Start requested. Continuous=' + continuousCheckbox.checked);
 
-// Theme toggling
-function applyTheme(theme){
-  if(theme === 'dark') document.body.classList.add('dark');
-  else document.body.classList.remove('dark');
-  try { localStorage.setItem('chm_theme', theme); } catch(e){}
-}
-function toggleTheme(){
-  const cur = document.body.classList.contains('dark') ? 'dark' : 'light';
-  applyTheme(cur === 'dark' ? 'light' : 'dark');
-}
-themeToggle.addEventListener('click', toggleTheme);
-
-// "Change Everything" button: toggle theme + randomize controls
-changeEverything.addEventListener('click', () => {
-  toggleTheme();
-  randomizeControls();
-  log('Change Everything: theme toggled + controls randomized');
-});
-
-// On load, restore theme (we default to dark here)
-(function(){
-  try {
-    const saved = localStorage.getItem('chm_theme') || 'dark';
-    applyTheme(saved);
-    if(saved === 'dark') document.body.classList.add('dark');
-  } catch(e){}
-})();
-
-function readOptions() {
-  return {
-    strong: parseFloat(strong.value),
-    weak: parseFloat(weak.value),
-    freq: parseFloat(frequency.value),
-    duty: parseFloat(duty.value)/100.0,
-    speedMs: parseInt(speed.value),
-    durationOverride: parseInt(duration.value) || null,
-    repeats: parseInt(repeats.value),
-    motor: motorTarget.value,
-    pattern: patternSelect.value
-  };
-}
-
-async function startContinuous(){
-  const opts = readOptions();
-  runningContinuous = true;
-  log('Started continuous run');
-  loopHandle = setInterval(async () => {
-    if (!runningContinuous) return;
-    const o = readOptions();
-    if (o.pattern === 'single') {
-      await singlePatternOnce(o);
-    } else if (o.pattern === 'buzz' || o.pattern === 'staccato') {
-      const periodMs = Math.max(10, Math.floor(1000 / o.freq));
-      const onMs = Math.max(5, Math.floor(periodMs * o.duty));
-      const offMs = Math.max(0, periodMs - onMs);
-      for (let r=0;r<o.repeats;r++) {
-        await playHaptics({
-          strongMag: (o.motor==='weak')?0:o.strong,
-          weakMag: (o.motor==='strong')?0:o.weak,
-          ms: onMs
-        });
-        if (offMs>0) await sleep(offMs);
+  if(continuousCheckbox.checked){
+    // continuous loop (run back-to-back until stopped)
+    (async function loopContinuous(){
+      while(running && continuousCheckbox.checked){
+        await runPatternCycle({freq: parseInt(frequency.value), speedMs: parseInt(speed.value), repeats: parseInt(repeatsInput.value), mag: outputMag});
+        // tiny pause if needed
+        await sleep(80);
       }
-    } else if (o.pattern === 'wave') {
-      const steps = 5;
-      for (let i=1;i<=steps;i++){
-        const scale = i/steps;
-        await playHaptics({
-          strongMag: ((o.motor==='weak')?0:o.strong)*scale,
-          weakMag: ((o.motor==='strong')?0:o.weak)*scale,
-          ms: Math.max(20, Math.floor(o.speedMs/ (steps*1.5)))
-        });
-        await sleep(40);
+      // ended
+      running = false;
+      stopBtn.disabled = true;
+      playBtn.disabled = false;
+      startBtn.disabled = false;
+      log('Continuous stopped.');
+    })();
+  } else {
+    // finite repeats run
+    (async function finiteRun(){
+      const reps = parseInt(repeatsInput.value) || 1;
+      for(let i=0;i<reps && running;i++){
+        await runPatternCycle({freq: parseInt(frequency.value), speedMs: parseInt(speed.value), repeats:1, mag: outputMag});
+        await sleep(60);
       }
-      for (let i=steps;i>=1;i--){
-        const scale = i/steps;
-        await playHaptics({
-          strongMag: ((o.motor==='weak')?0:o.strong)*scale,
-          weakMag: ((o.motor==='strong')?0:o.weak)*scale,
-          ms: Math.max(20, Math.floor(o.speedMs/ (steps*1.5)))
-        });
-        await sleep(40);
-      }
-    }
-  }, Math.max(60, opts.speedMs || 500));
-}
-
-function stopContinuous(){
-  runningContinuous = false;
-  if (loopHandle) {
-    clearInterval(loopHandle);
-    loopHandle = null;
+      running = false;
+      stopBtn.disabled = true;
+      playBtn.disabled = false;
+      startBtn.disabled = false;
+      log('Finite run finished.');
+    })();
   }
-  loopBtn.textContent = 'Start';
-  stopBtn.disabled = true;
-  log('Stopped continuous run');
 }
 
+// Stop graceful
+function stopRun(){
+  if(!running){ log('Nothing running'); return; }
+  running = false;
+  // Let current micro-pulse finish; handlers check running flag
+  log('Stop requested (graceful).');
+}
+
+// Emergency immediate stop
+function emergencyStop(){
+  if(!running){ log('Emergency stop — nothing running'); return; }
+  running = false;
+  // Attempt to cancel any ongoing vibrations by sending a tiny zero-duration (best-effort)
+  try{
+    const gps = navigator.getGamepads ? navigator.getGamepads() : [];
+    const gp = gps[gpIndex] || gps.find(g=>g && g.connected) || null;
+    if(gp && gp.vibrationActuator && typeof gp.vibrationActuator.playEffect === 'function'){
+      gp.vibrationActuator.playEffect('dual-rumble',{duration:1, strongMagnitude:0, weakMagnitude:0});
+    } else if(gp && gp.hapticActuators && gp.hapticActuators.length>0){
+      gp.hapticActuators[0].pulse(0,1).catch(()=>{});
+    }
+  }catch(e){}
+  stopBtn.disabled = true;
+  playBtn.disabled = false;
+  startBtn.disabled = false;
+  log('Emergency STOP executed.');
+}
+
+// Run one pattern cycle: uses frequency to create short bursts for a few cycles
+async function runPatternCycle({freq=20, speedMs=800, repeats=1, mag=0.6}={}){
+  // We'll perform 'repeats' bursts per call; each burst contains N cycles based on freq and burst length derived from speedMs
+  const burstCycles = 6; // number of small on/off in one burst
+  const periodMs = Math.max(8, Math.floor(1000 / Math.max(1, freq)));
+  const onMs = Math.max(8, Math.floor(periodMs * 0.6));
+  const offMs = Math.max(0, periodMs - onMs);
+
+  for(let r=0;r<repeats && running;r++){
+    for(let c=0;c<burstCycles && running;c++){
+      await sendHaptic(mag, onMs);
+      if(offMs>0) await sleep(offMs);
+    }
+    // gap between bursts influenced by speedMs
+    await sleep(Math.max(40, Math.floor(speedMs / Math.max(1, repeats))));
+  }
+}
+
+// send haptic vibration (best-effort across browser variants)
+async function sendHaptic(magnitude=0.6, ms=200){
+  updateOutput(magnitude);
+  const gps = navigator.getGamepads ? navigator.getGamepads() : [];
+  const gp = gps[gpIndex] || gps.find(g=>g && g.connected) || null;
+  if(!gp) { await sleep(ms); updateOutput(0); return; }
+
+  try{
+    if(gp.vibrationActuator && typeof gp.vibrationActuator.playEffect === 'function'){
+      // map magnitude to both motors as best-effort
+      await gp.vibrationActuator.playEffect('dual-rumble',{duration: ms, strongMagnitude: magnitude, weakMagnitude: magnitude});
+    } else if(gp.hapticActuators && gp.hapticActuators.length>0){
+      await gp.hapticActuators[0].pulse(magnitude, ms);
+    } else {
+      // no haptics
+      await sleep(ms);
+    }
+  }catch(e){
+    // ignore but log
+    log('Haptic error: ' + (e && e.message ? e.message : e));
+    await sleep(ms);
+  }
+  updateOutput(0);
+}
+
+// update visual output bar
+function updateOutput(v){
+  outBar.style.width = Math.round(v*100) + '%';
+  outNum.textContent = v.toFixed(2);
+}
+
+// simple utils
 function sleep(ms){ return new Promise(res=>setTimeout(res, ms)); }
 
+// randomize controls (non-destructive)
 function randomizeControls(){
-  strong.value = (Math.random()*0.9).toFixed(2);
-  weak.value = (Math.random()*0.9).toFixed(2);
-  frequency.value = Math.floor(5 + Math.random()*70);
-  duty.value = Math.floor(10 + Math.random()*80);
-  speed.value = Math.floor(200 + Math.random()*2000);
-  duration.value = Math.floor(50 + Math.random()*800);
-  repeats.value = Math.floor(1 + Math.random()*8);
-  patternSelect.selectedIndex = Math.floor(Math.random()*patternSelect.options.length);
-  motorTarget.selectedIndex = Math.floor(Math.random()*motorTarget.options.length);
-  updateLabels();
-  log('Randomized controls');
+  repeatsInput.value = Math.floor(1 + Math.random()*8);
+  frequency.value = Math.floor(6 + Math.random()*60); freqVal.textContent = frequency.value;
+  speed.value = Math.floor(300 + Math.random()*1200); speedVal.textContent = speed.value;
+  log('Controls randomized');
 }
 
-function log(msg) {
-  const t = document.createElement('div');
-  t.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-  logEl.prepend(t);
-}
+// Toggle start/stop convenience
+function toggleStartStop(){ if(running) stopRun(); else startRun(); }
 
-// poll and render gamepad state frequently
+// poll for gamepad updates (buttons visual only)
 function tick(){
-  renderGamepadState();
+  // update visual highlights already handled by pollGamepad via RAF
   requestAnimationFrame(tick);
 }
-
-scanGamepads();
-setInterval(scanGamepads, 2000);
-setInterval(updateUI, 1000);
-updateLabels();
 tick();
+
+// Start polling gamepad read loop
+(function(){
+  // start pollGamepad earlier function if not already (it was requested via RAF)
+  // we'll just ensure mapping available
+  if(typeof navigator.getGamepads === 'function') {
+    requestAnimationFrame(pollGamepad);
+  }
+})();
+
+// respond to ESC key as emergency
+window.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') emergencyStop(); });
+
+log('Ready.');

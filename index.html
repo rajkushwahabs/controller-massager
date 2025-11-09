@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Controller Massager — Visualizer</title>
+  <title>Controller Massager — Final</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -11,11 +11,11 @@
     <header class="topbar">
       <div class="title-wrap">
         <h1>Controller Massager</h1>
-        <p class="subtitle">Visualizer & Haptics Studio</p>
+        <p class="subtitle">Simple controls · Controller shortcuts · Continuous presets</p>
       </div>
       <div class="top-controls">
-        <button id="themeToggle" class="btn icon" title="Toggle dark / light">🌙</button>
-        <button id="changeEverything" class="btn" title="Surprise — randomize & toggle theme">Surprise</button>
+        <button id="themeToggle" class="btn icon" title="Toggle theme">🌙</button>
+        <button id="surpriseBtn" class="btn ghost" title="Surprise">Surprise</button>
       </div>
     </header>
 
@@ -25,94 +25,76 @@
     </section>
 
     <section id="controls" class="hidden">
-      <div class="grid">
-        <div class="control">
-          <label>Strong motor (left): <span id="strongVal">0.6</span></label>
-          <input id="strong" type="range" min="0" max="1" step="0.01" value="0.6">
+      <div class="simple-controls">
+        <div class="form-row">
+          <label>Repeats</label>
+          <div class="input-row">
+            <button id="repDec" class="btn small">−</button>
+            <input id="repeats" type="number" min="1" max="999" value="3">
+            <button id="repInc" class="btn small">+</button>
+          </div>
         </div>
 
-        <div class="control">
-          <label>Weak motor (right): <span id="weakVal">0.6</span></label>
-          <input id="weak" type="range" min="0" max="1" step="0.01" value="0.6">
+        <div class="form-row">
+          <label>Frequency (Hz)</label>
+          <div class="input-row">
+            <button id="freqDec" class="btn small">−</button>
+            <input id="frequency" type="range" min="1" max="120" value="20">
+            <button id="freqInc" class="btn small">+</button>
+            <div class="val" id="freqVal">20</div>
+          </div>
         </div>
 
-        <div class="control">
-          <label>Frequency (Hz): <span id="freqVal">20</span></label>
-          <input id="frequency" type="range" min="1" max="120" step="1" value="20">
+        <div class="form-row">
+          <label>Speed (ms)</label>
+          <div class="input-row">
+            <button id="speedDec" class="btn small">−</button>
+            <input id="speed" type="range" min="100" max="3000" step="50" value="800">
+            <button id="speedInc" class="btn small">+</button>
+            <div class="val" id="speedVal">800</div>
+          </div>
         </div>
 
-        <div class="control">
-          <label>Duty cycle (%): <span id="dutyVal">50</span></label>
-          <input id="duty" type="range" min="5" max="95" step="1" value="50">
+        <div class="form-row">
+          <label>Continuous</label>
+          <label class="switch"><input id="continuous" type="checkbox"><span class="slider"></span></label>
         </div>
 
-        <div class="control">
-          <label>Speed (ms): <span id="speedVal">800</span></label>
-          <input id="speed" type="range" min="100" max="5000" step="50" value="800">
-        </div>
-
-        <div class="control">
-          <label>Pulse duration (ms): <span id="durVal">400</span></label>
-          <input id="duration" type="range" min="10" max="2000" step="10" value="400">
-        </div>
-
-        <div class="control">
-          <label>Repeats: <span id="repeatsVal">3</span></label>
-          <input id="repeats" type="range" min="1" max="20" step="1" value="3">
-        </div>
-
-        <div class="control">
-          <label>Motor target:</label>
-          <select id="motorTarget" class="select">
-            <option value="both">Both</option>
-            <option value="strong">Strong only</option>
-            <option value="weak">Weak only</option>
+        <div class="form-row">
+          <label>Presets (continuous)</label>
+          <select id="presetSelect" class="select">
+            <option value="">— Choose preset —</option>
+            <option value="gentle">Gentle (low freq, smooth)</option>
+            <option value="medium">Medium (balanced)</option>
+            <option value="strong">Strong (high freq)</option>
+            <option value="pulse">Pulse (short bursts)</option>
+            <option value="wave">Wave (ramp)</option>
+            <option value="random">Random Continuous</option>
           </select>
         </div>
 
-        <div class="control">
-          <label>Preset:</label>
-          <select id="patternSelect" class="select">
-            <option value="single">Single</option>
-            <option value="buzz">Buzz</option>
-            <option value="wave">Wave</option>
-            <option value="staccato">Staccato</option>
-          </select>
+        <div class="row actions">
+          <button id="playBtn" class="btn primary">Play</button>
+          <button id="startBtn" class="btn">Start</button>
+          <button id="stopBtn" class="btn" disabled>Stop</button>
+          <button id="emergencyBtn" class="btn danger">Emergency Stop</button>
         </div>
-      </div>
-
-      <div class="row actions">
-        <button id="pulseBtn" class="btn primary">Play</button>
-        <button id="loopBtn" class="btn">Start</button>
-        <button id="stopBtn" class="btn" disabled>Stop</button>
-        <button id="randomBtn" class="btn ghost">Random</button>
       </div>
 
       <div class="visualizer">
         <div class="v-row">
-          <div class="v-label">Strong</div>
-          <div class="bar" id="strongBar"><div class="fill" style="width:0%"></div></div>
-          <div class="v-num" id="strongNum">0.00</div>
-        </div>
-        <div class="v-row">
-          <div class="v-label">Weak</div>
-          <div class="bar" id="weakBar"><div class="fill" style="width:0%"></div></div>
-          <div class="v-num" id="weakNum">0.00</div>
+          <div class="v-label">Output</div>
+          <div class="bar" id="outBar"><div class="fill" style="width:0%"></div></div>
+          <div class="v-num" id="outNum">0.00</div>
         </div>
 
-        <div class="gamepad-state">
-          <div class="gp-left">
-            <h4>Buttons</h4>
-            <div id="buttons"></div>
-          </div>
-          <div class="gp-right">
-            <h4>Axes</h4>
-            <div id="axes"></div>
-          </div>
+        <div class="gamepad-panel">
+          <h4>Controller Buttons (clickable & live)</h4>
+          <div id="buttons" class="buttons-grid"></div>
         </div>
+
+        <div id="log" class="log"></div>
       </div>
-
-      <div id="log" class="log"></div>
     </section>
 
     <footer class="footer">
