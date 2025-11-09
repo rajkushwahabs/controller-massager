@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Controller Massager — Visualizer</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="card">
+    <header class="topbar">
+      <div class="title-wrap">
+        <h1>Controller Massager</h1>
+        <p class="subtitle">Visualizer & Haptics Studio</p>
+      </div>
+      <div class="top-controls">
+        <button id="themeToggle" class="btn icon" title="Toggle dark / light">🌙</button>
+        <button id="changeEverything" class="btn" title="Surprise — randomize & toggle theme">Surprise</button>
+      </div>
+    </header>
+
+    <section id="status" class="status">
+      <p id="gp-info">No gamepad detected. Connect a controller and press any button.</p>
+      <p id="support-info" class="muted"></p>
+    </section>
+
+    <section id="controls" class="hidden">
+      <div class="grid">
+        <div class="control">
+          <label>Strong motor (left): <span id="strongVal">0.6</span></label>
+          <input id="strong" type="range" min="0" max="1" step="0.01" value="0.6">
+        </div>
+
+        <div class="control">
+          <label>Weak motor (right): <span id="weakVal">0.6</span></label>
+          <input id="weak" type="range" min="0" max="1" step="0.01" value="0.6">
+        </div>
+
+        <div class="control">
+          <label>Frequency (Hz): <span id="freqVal">20</span></label>
+          <input id="frequency" type="range" min="1" max="120" step="1" value="20">
+        </div>
+
+        <div class="control">
+          <label>Duty cycle (%): <span id="dutyVal">50</span></label>
+          <input id="duty" type="range" min="5" max="95" step="1" value="50">
+        </div>
+
+        <div class="control">
+          <label>Speed (ms): <span id="speedVal">800</span></label>
+          <input id="speed" type="range" min="100" max="5000" step="50" value="800">
+        </div>
+
+        <div class="control">
+          <label>Pulse duration (ms): <span id="durVal">400</span></label>
+          <input id="duration" type="range" min="10" max="2000" step="10" value="400">
+        </div>
+
+        <div class="control">
+          <label>Repeats: <span id="repeatsVal">3</span></label>
+          <input id="repeats" type="range" min="1" max="20" step="1" value="3">
+        </div>
+
+        <div class="control">
+          <label>Motor target:</label>
+          <select id="motorTarget" class="select">
+            <option value="both">Both</option>
+            <option value="strong">Strong only</option>
+            <option value="weak">Weak only</option>
+          </select>
+        </div>
+
+        <div class="control">
+          <label>Preset:</label>
+          <select id="patternSelect" class="select">
+            <option value="single">Single</option>
+            <option value="buzz">Buzz</option>
+            <option value="wave">Wave</option>
+            <option value="staccato">Staccato</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row actions">
+        <button id="pulseBtn" class="btn primary">Play</button>
+        <button id="loopBtn" class="btn">Start</button>
+        <button id="stopBtn" class="btn" disabled>Stop</button>
+        <button id="randomBtn" class="btn ghost">Random</button>
+      </div>
+
+      <div class="visualizer">
+        <div class="v-row">
+          <div class="v-label">Strong</div>
+          <div class="bar" id="strongBar"><div class="fill" style="width:0%"></div></div>
+          <div class="v-num" id="strongNum">0.00</div>
+        </div>
+        <div class="v-row">
+          <div class="v-label">Weak</div>
+          <div class="bar" id="weakBar"><div class="fill" style="width:0%"></div></div>
+          <div class="v-num" id="weakNum">0.00</div>
+        </div>
+
+        <div class="gamepad-state">
+          <div class="gp-left">
+            <h4>Buttons</h4>
+            <div id="buttons"></div>
+          </div>
+          <div class="gp-right">
+            <h4>Axes</h4>
+            <div id="axes"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="log" class="log"></div>
+    </section>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        <div class="credits">Built with Gamepad API. Chrome desktop recommended. Use responsibly.</div>
+        <div class="creator">Created by <span class="creator-name">Renzy</span></div>
+      </div>
+    </footer>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
