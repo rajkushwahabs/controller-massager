@@ -46,3 +46,20 @@ body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,Segoe UI
 .footer-inner{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .creator-name{background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:800;padding:4px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.03)}
 @media (max-width:640px){ .form-row{flex-direction:column;align-items:flex-start} .duration-controls{flex-direction:column;align-items:flex-start} }
+
+/* Instagram button beside creator name */
+.insta-btn {
+  margin-left: 8px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #f58529, #dd2a7b, #8134af, #515bd4);
+  color: white;
+  font-weight: 600;
+  font-size: 13px;
+  text-decoration: none;
+  transition: all 0.2s ease-in-out;
+}
+.insta-btn:hover {
+  transform: translateY(-1px) scale(1.03);
+  box-shadow: 0 2px 10px rgba(221,42,123,0.5);
+}
