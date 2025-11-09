@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Controller Massager — Final</title>
+  <title>Controller Massager — Modes</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -11,11 +11,7 @@
     <header class="topbar">
       <div class="title-wrap">
         <h1>Controller Massager</h1>
-        <p class="subtitle">Simple controls · Controller shortcuts · Continuous presets</p>
-      </div>
-      <div class="top-controls">
-        <button id="themeToggle" class="btn icon" title="Toggle theme">🌙</button>
-        <button id="surpriseBtn" class="btn ghost" title="Surprise">Surprise</button>
+        <p class="subtitle">Modes: Preset · Basic · Advanced · Renzy</p>
       </div>
     </header>
 
@@ -25,76 +21,135 @@
     </section>
 
     <section id="controls" class="hidden">
-      <div class="simple-controls">
-        <div class="form-row">
-          <label>Repeats</label>
-          <div class="input-row">
-            <button id="repDec" class="btn small">−</button>
-            <input id="repeats" type="number" min="1" max="999" value="3">
-            <button id="repInc" class="btn small">+</button>
+
+      <div class="mode-row">
+        <label>Mode</label>
+        <select id="modeSelect" class="select">
+          <option value="preset">Preset Mode</option>
+          <option value="basic">Basic Mode</option>
+          <option value="advanced">Advanced Mode</option>
+          <option value="renzy">Renzy Mode</option>
+        </select>
+      </div>
+
+      <div id="modeContainer">
+
+        <!-- Preset Mode -->
+        <div class="modePanel" id="presetPanel">
+          <div class="form-row">
+            <label>Preset list (Choose one)</label>
+            <select id="presetList" class="select">
+              <option value="">— select preset —</option>
+              <option value="gentle_swell">Gentle Swell</option>
+              <option value="short_buzz">Short Buzz</option>
+              <option value="long_wave">Long Wave</option>
+              <option value="pulse_rapid">Rapid Pulse</option>
+              <option value="slow_pulse">Slow Pulse</option>
+              <option value="random_mix">Random Mix</option>
+              <option value="strong_burst">Strong Burst</option>
+              <option value="heartbeat">Heartbeat</option>
+              <option value="tingle">Tingle</option>
+              <option value="relax">Relax</option>
+            </select>
           </div>
         </div>
 
-        <div class="form-row">
-          <label>Frequency (Hz)</label>
-          <div class="input-row">
-            <button id="freqDec" class="btn small">−</button>
-            <input id="frequency" type="range" min="1" max="120" value="20">
-            <button id="freqInc" class="btn small">+</button>
-            <div class="val" id="freqVal">20</div>
+        <!-- Basic Mode -->
+        <div class="modePanel hidden" id="basicPanel">
+          <div class="form-row">
+            <label>Intensity</label>
+            <input id="basicIntensity" type="range" min="0" max="1" step="0.01" value="0.6">
+            <div class="val" id="basicIntensityVal">0.60</div>
+          </div>
+          <div class="form-row">
+            <label>Frequency (Hz)</label>
+            <input id="basicFreq" type="range" min="1" max="120" value="20">
+            <div class="val" id="basicFreqVal">20</div>
+          </div>
+          <div class="form-row">
+            <label>Speed (ms)</label>
+            <input id="basicSpeed" type="range" min="100" max="3000" step="50" value="800">
+            <div class="val" id="basicSpeedVal">800</div>
           </div>
         </div>
 
-        <div class="form-row">
-          <label>Speed (ms)</label>
-          <div class="input-row">
-            <button id="speedDec" class="btn small">−</button>
-            <input id="speed" type="range" min="100" max="3000" step="50" value="800">
-            <button id="speedInc" class="btn small">+</button>
-            <div class="val" id="speedVal">800</div>
+        <!-- Advanced Mode -->
+        <div class="modePanel hidden" id="advancedPanel">
+          <div class="form-row">
+            <label>Left motor (approx)</label>
+            <input id="advLeft" type="range" min="0" max="1" step="0.01" value="0.6">
+            <div class="val" id="advLeftVal">0.60</div>
+          </div>
+          <div class="form-row">
+            <label>Right motor (approx)</label>
+            <input id="advRight" type="range" min="0" max="1" step="0.01" value="0.6">
+            <div class="val" id="advRightVal">0.60</div>
+          </div>
+          <div class="form-row">
+            <label>Frequency (Hz)</label>
+            <input id="advFreq" type="range" min="1" max="200" value="30">
+            <div class="val" id="advFreqVal">30</div>
+          </div>
+          <div class="form-row">
+            <label>Pulse length ms</label>
+            <input id="advPulse" type="range" min="10" max="2000" value="200">
+            <div class="val" id="advPulseVal">200</div>
+          </div>
+          <div class="form-row">
+            <label>Pattern repeats per burst</label>
+            <input id="advRepeats" type="number" min="1" max="100" value="3">
           </div>
         </div>
 
-        <div class="form-row">
-          <label>Continuous</label>
-          <label class="switch"><input id="continuous" type="checkbox"><span class="slider"></span></label>
+        <!-- Renzy Mode -->
+        <div class="modePanel hidden" id="renzyPanel">
+          <div class="form-row">
+            <label>Renzy mode is MAX intensity nonstop</label>
+            <div class="muted">This will vibrate at highest intensity without interruptions until you stop it.</div>
+          </div>
         </div>
 
-        <div class="form-row">
-          <label>Presets (continuous)</label>
-          <select id="presetSelect" class="select">
-            <option value="">— Choose preset —</option>
-            <option value="gentle">Gentle (low freq, smooth)</option>
-            <option value="medium">Medium (balanced)</option>
-            <option value="strong">Strong (high freq)</option>
-            <option value="pulse">Pulse (short bursts)</option>
-            <option value="wave">Wave (ramp)</option>
-            <option value="random">Random Continuous</option>
-          </select>
-        </div>
+      </div>
 
-        <div class="row actions">
-          <button id="playBtn" class="btn primary">Play</button>
-          <button id="startBtn" class="btn">Start</button>
-          <button id="stopBtn" class="btn" disabled>Stop</button>
-          <button id="emergencyBtn" class="btn danger">Emergency Stop</button>
+      <!-- Duration options (minutes:seconds or until stopped) -->
+      <div class="duration-row">
+        <label>Duration</label>
+        <div class="duration-controls">
+          <div class="mini">
+            <input id="durMin" type="number" min="0" max="60" value="0"> <small>min</small>
+          </div>
+          <div class="mini">
+            <input id="durSec" type="number" min="0" max="59" value="30"> <small>sec</small>
+          </div>
+          <label class="switch small">
+            <input id="untilStopped" type="checkbox"><span class="slider"></span>
+            <span class="switch-label">Until stopped</span>
+          </label>
         </div>
       </div>
 
+      <!-- Controls -->
+      <div class="row actions">
+        <button id="startBtn" class="btn primary">Start</button>
+        <button id="stopBtn" class="btn" disabled>Stop</button>
+        <button id="playBtn" class="btn">Test</button>
+        <button id="emergencyBtn" class="btn danger">Emergency Stop</button>
+      </div>
+
+      <!-- Status & visualizer -->
       <div class="visualizer">
         <div class="v-row">
           <div class="v-label">Output</div>
           <div class="bar" id="outBar"><div class="fill" style="width:0%"></div></div>
           <div class="v-num" id="outNum">0.00</div>
         </div>
-
-        <div class="gamepad-panel">
-          <h4>Controller Buttons (clickable & live)</h4>
-          <div id="buttons" class="buttons-grid"></div>
+        <div class="status-row">
+          <div id="runningStatus" class="badge">Stopped</div>
+          <div id="modeStatus" class="muted">Mode: Preset</div>
         </div>
-
         <div id="log" class="log"></div>
       </div>
+
     </section>
 
     <footer class="footer">
