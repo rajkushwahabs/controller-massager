@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Controller Massager — Final</title>
+  <title>Controller Massager — Continuous</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -11,11 +11,7 @@
     <header class="topbar">
       <div class="title-wrap">
         <h1>Controller Massager</h1>
-        <p class="subtitle">Simple controls · Controller shortcuts · Continuous presets</p>
-      </div>
-      <div class="top-controls">
-        <button id="themeToggle" class="btn icon" title="Toggle theme">🌙</button>
-        <button id="surpriseBtn" class="btn ghost" title="Surprise">Surprise</button>
+        <p class="subtitle">Simplified UI · Continuous presets</p>
       </div>
     </header>
 
@@ -28,31 +24,17 @@
       <div class="simple-controls">
         <div class="form-row">
           <label>Repeats</label>
-          <div class="input-row">
-            <button id="repDec" class="btn small">−</button>
-            <input id="repeats" type="number" min="1" max="999" value="3">
-            <button id="repInc" class="btn small">+</button>
-          </div>
+          <input id="repeats" type="number" min="1" max="999" value="3">
         </div>
 
         <div class="form-row">
           <label>Frequency (Hz)</label>
-          <div class="input-row">
-            <button id="freqDec" class="btn small">−</button>
-            <input id="frequency" type="range" min="1" max="120" value="20">
-            <button id="freqInc" class="btn small">+</button>
-            <div class="val" id="freqVal">20</div>
-          </div>
+          <input id="frequency" type="range" min="1" max="120" value="20">
         </div>
 
         <div class="form-row">
           <label>Speed (ms)</label>
-          <div class="input-row">
-            <button id="speedDec" class="btn small">−</button>
-            <input id="speed" type="range" min="100" max="3000" step="50" value="800">
-            <button id="speedInc" class="btn small">+</button>
-            <div class="val" id="speedVal">800</div>
-          </div>
+          <input id="speed" type="range" min="100" max="3000" step="50" value="800">
         </div>
 
         <div class="form-row">
@@ -61,14 +43,14 @@
         </div>
 
         <div class="form-row">
-          <label>Presets (continuous)</label>
+          <label>Presets</label>
           <select id="presetSelect" class="select">
             <option value="">— Choose preset —</option>
-            <option value="gentle">Gentle (low freq, smooth)</option>
-            <option value="medium">Medium (balanced)</option>
-            <option value="strong">Strong (high freq)</option>
-            <option value="pulse">Pulse (short bursts)</option>
-            <option value="wave">Wave (ramp)</option>
+            <option value="gentle">Gentle</option>
+            <option value="medium">Medium</option>
+            <option value="strong">Strong</option>
+            <option value="pulse">Pulse</option>
+            <option value="wave">Wave</option>
             <option value="random">Random Continuous</option>
           </select>
         </div>
@@ -86,11 +68,6 @@
           <div class="v-label">Output</div>
           <div class="bar" id="outBar"><div class="fill" style="width:0%"></div></div>
           <div class="v-num" id="outNum">0.00</div>
-        </div>
-
-        <div class="gamepad-panel">
-          <h4>Controller Buttons (clickable & live)</h4>
-          <div id="buttons" class="buttons-grid"></div>
         </div>
 
         <div id="log" class="log"></div>
