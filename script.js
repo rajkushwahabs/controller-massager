@@ -103,7 +103,38 @@ function startRun(){
   (async function loop(){ const startTs=Date.now(); while(running){ if(!untilStopped){ const elapsed=Math.floor((Date.now()-startTs)/1000); if(elapsed>=totalSecs) break; }
     if(mode==='preset'){ const p=presetList.value||'gentle_swell'; applyPresetKey(p); await runPattern({mag: outputMag, freq: parseInt(basicFreq.value), speed: parseInt(basicSpeed.value), repeats:1}); }
     else if(mode==='basic'){ await runPattern({mag: parseFloat(basicIntensity.value), freq: parseInt(basicFreq.value), speed: parseInt(basicSpeed.value), repeats:1}); }
-    else if(mode==='advanced'){ await runPattern({mag: Math.max(parseFloat(advLeft.value), parseFloat(advRight.value)), freq: parseInt(advFreq.value), speed: parseInt(advPulse.value), repeats: parseInt(advRepeats.value)}); }
+    else if(mode==='advanced'){
+        // advanced: use separate left/right magnitudes and advanced controls
+        const leftMag = parseFloat(advLeft.value);
+        const rightMag = parseFloat(advRight.value);
+        const freq = parseInt(advFreq.value);
+        const pulseMs = parseInt(advPulse.value);
+        const repeats = parseInt(advRepeats.value) || 1;
+
+        // We'll implement an advanced cycle that respects waveform, duty and phase
+        const totalCycles = Math.max(1, Math.floor((pulseMs > 0 ? pulseMs : 200) / Math.max(8, Math.floor(1000/Math.max(1,freq)))));
+        for(let r=0;r<repeats && running;r++){
+          for(let c=0;c<totalCycles && running;c++){
+            // compute magnitudes for this small cycle
+            const [lmag, rmag] = computeMotorMagnitudes(leftMag, rightMag, c, totalCycles);
+
+            // phase offset: if advPhase > 0, offset right motor by advPhase ms relative to left
+            const phase = parseInt(advPhase.value) || 0;
+            if(phase > 0){
+              // left then delayed right (or vice versa if alternate)
+              await sendHapticPair(lmag, Math.max(0, pulseMs / totalCycles - phase));
+              if(!running) break;
+              await sleep(phase);
+              await sendHapticPair(0, rmag);
+            } else {
+              await sendHapticPair(lmag, Math.max(8, Math.floor(1000/Math.max(1,freq))*0.6));
+              if(!running) break;
+            }
+            await sleep(Math.max(0, Math.floor(pulseMs/Math.max(1,repeats))/totalCycles));
+          }
+          await sleep(60);
+        }
+      }
     await sleep(80); }
     running=false; runningStatus.textContent='Stopped'; stopBtn.disabled=true; startBtn.disabled=false; playBtn.disabled=false; log('Run finished'); })();
 }
@@ -118,6 +149,28 @@ function stopRun(){ if(!running){ log('Nothing running'); return; } running=fals
 function emergencyStop(){ running=false; runningStatus.textContent='Emergency STOP'; try{ const gps=navigator.getGamepads?navigator.getGamepads():[]; const gp=(gpIndex!==null && gps[gpIndex])?gps[gpIndex]:(gps.find(g=>g && g.connected)||null); if(gp){ if(gp.vibrationActuator && typeof gp.vibrationActuator.playEffect==='function'){ gp.vibrationActuator.playEffect('dual-rumble',{duration:1, strongMagnitude:0, weakMagnitude:0}); } else if(gp.hapticActuators && gp.hapticActuators.length>0){ gp.hapticActuators[0].pulse(0,1).catch(()=>{}); } } }catch(e){} stopBtn.disabled=true; startBtn.disabled=false; playBtn.disabled=false; log('Emergency STOP executed'); }
 async function runPattern({mag=0.6, freq=20, speed=800, repeats=1} = {}){ const burstCycles=6; const periodMs=Math.max(8, Math.floor(1000/Math.max(1,freq))); const onMs=Math.max(8, Math.floor(periodMs*0.6)); const offMs=Math.max(0, periodMs-onMs); for(let r=0;r<repeats && running;r++){ for(let c=0;c<burstCycles && running;c++){ await sendHaptic(mag, onMs); if(offMs>0) await sleep(offMs); } await sleep(Math.max(40, Math.floor(speed/Math.max(1,repeats)))); } }
 async function sendHaptic(magnitude=0.6, ms=200){ updateOutput(magnitude); const gps=navigator.getGamepads?navigator.getGamepads():[]; const gp=(gpIndex!==null && gps[gpIndex])?gps[gpIndex]:(gps.find(g=>g && g.connected)||null); if(!gp){ await sleep(ms); updateOutput(0); return; } try{ if(gp.vibrationActuator && typeof gp.vibrationActuator.playEffect==='function'){ await gp.vibrationActuator.playEffect('dual-rumble',{duration:ms, strongMagnitude:magnitude, weakMagnitude:magnitude}); } else if(gp.hapticActuators && gp.hapticActuators.length>0){ await gp.hapticActuators[0].pulse(magnitude, ms); } else { await sleep(ms); } }catch(e){ log('Haptic error: '+(e && e.message?e.message:e)); await sleep(ms); } updateOutput(0); }
+
+// send a left/right haptic pair (map to strong/weak where possible)
+async function sendHapticPair(leftMag=0.6, ms=150){
+  // Many controllers map strongMagnitude to left and weakMagnitude to right (best effort)
+  updateOutput(Math.max(leftMag, 0));
+  const gps = navigator.getGamepads ? navigator.getGamepads() : [];
+  const gp = (gpIndex !== null && gps[gpIndex]) ? gps[gpIndex] : (gps.find(g=>g && g.connected) || null);
+  if(!gp){ await sleep(ms); updateOutput(0); return; }
+  try{
+    if(gp.vibrationActuator && typeof gp.vibrationActuator.playEffect === 'function'){
+      await gp.vibrationActuator.playEffect('dual-rumble',{duration: ms, strongMagnitude: leftMag, weakMagnitude: leftMag});
+    } else if(gp.hapticActuators && gp.hapticActuators.length>0){
+      await gp.hapticActuators[0].pulse(leftMag, ms);
+    } else {
+      await sleep(ms);
+    }
+  }catch(e){
+    await sleep(ms);
+  }
+  updateOutput(0);
+}
+
 function updateOutput(v){ outBar.style.width = Math.round(v*100) + '%'; outNum.textContent = v.toFixed(2); }
 function randomizeControls(){ basicIntensity.value=(0.2+Math.random()*0.7).toFixed(2); basicFreq.value=Math.floor(6+Math.random()*60); basicSpeed.value=Math.floor(300+Math.random()*1200); basicIntensityVal.textContent=basicIntensity.value; basicFreqVal.textContent=basicFreq.value; basicSpeedVal.textContent=basicSpeed.value; log('Randomized controls'); }
 function sleep(ms){ return new Promise(res=>setTimeout(res, ms)); }

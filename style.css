@@ -47,6 +47,39 @@ body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,Segoe UI
 .creator-name{background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:800;padding:4px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.03)}
 @media (max-width:640px){ .form-row{flex-direction:column;align-items:flex-start} .duration-controls{flex-direction:column;align-items:flex-start} }
 
+
+/* Enhanced glow effect for 'Until stopped' checkbox when active */
+.switch.small {
+  position: relative;
+}
+.switch.small input:checked + .slider {
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  box-shadow: 0 0 12px rgba(63, 224, 176, 0.8), 0 0 24px rgba(102, 177, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.switch.small .slider:before {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 4px;
+  top: 3px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: 0.3s;
+}
+.switch.small input:checked + .slider:before {
+  transform: translateX(18px);
+  background: white;
+  box-shadow: 0 0 10px rgba(255,255,255,0.9);
+}
+
+
+
+.input-row{display:flex;align-items:center;gap:8px}
+.select{min-width:160px}
+
+
 /* Instagram button beside creator name */
 .insta-btn {
   margin-left: 8px;
